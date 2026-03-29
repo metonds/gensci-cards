@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>GenSci Cards</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&amp;family=Alegreya:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    * { font-family: 'Alegreya', serif; }
+    .card-container {
+      perspective: 800px;
+    }
+    .game-card {
+      width: 100px;
+      height: 140px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s, margin-top 0.3s;
+      user-select: none;
+      position: relative;
+      flex-shrink: 0;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+    @media (min-width: 768px) {
+      .game-card {
+        width: 120px;
+        height: 168px;
+        border-radius: 12px;
+      }
+    }
+    .game-card:hover {
+      transform: translateY(-16px) scale(1.05);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.6), 0 0 20px rgba(126, 201, 161, 0.3);
+      filter: drop-shadow(0 8px 20px rgba(0,0,0,0.4));
+    }
+    @media (max-width: 767px) {
+      .game-card:active {
+        transform: translateY(-12px) scale(1.08);
+      }
+    }
+    .game-card.selected {
+      margin-top: -20px;
+      box-shadow: 0 12px 40px rgba(220, 38, 38, 1);
+      outline: 4px solid #dc2626;
+      transform: translateY(-8px) scale(1.08);
+    }
+    @media (max-width: 767px) {
+      .game-card.selected {
+        margin-top: -16px;
+        outline: 3px solid #dc2626;
+      }
+    }
+    .game-card .rank-top { position: absolute; top: 4px; left: 6px; font-size: 10px; font-weight: 700; line-height: 1; overflow: hidden; max-width: 65px; }
+    .game-card .suit-top { position: absolute; top: 20px; left: 6px; font-size: 14px; line-height: 1; }
+    .game-card .suit-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 32px; }
+    .game-card .rank-bottom { position: absolute; bottom: 4px; right: 6px; font-size: 10px; font-weight: 700; line-height: 1; transform: rotate(180deg); overflow: hidden; max-width: 65px; text-align: right; }
+
+    .hand-area {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      min-height: 110px;
+      padding: 0 8px;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+    @media (min-width: 768px) {
+      .hand-area {
+        min-height: 130px;
+        padding: 0 10px;
+        gap: 4px;
+      }
+    }
+
+    .pile-card {
+      width: 100px;
+      height: 140px;
+      border-radius: 8px;
+      position: absolute;
+    }
+    @media (min-width: 768px) {
+      .pile-card {
+        width: 120px;
+        height: 168px;
+        border-radius: 12px;
+      }
+    }
+
+    @keyframes dealIn {
+      from { opacity: 0; transform: translateY(40px) scale(0.8); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .deal-anim { animation: dealIn 0.3s ease-out forwards; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-up { animation: slideUp 0.4s ease-out; }
+
+    @keyframes cardFlip {
+      0% { transform: rotateY(0deg) scale(1); }
+      50% { transform: rotateY(90deg) scale(1.05); }
+      100% { transform: rotateY(0deg) scale(1); }
+    }
+    .card-flip { animation: cardFlip 0.6s ease-out; }
+
+    @keyframes slideInPile {
+      from { opacity: 0; transform: scale(0.7) translateY(-20px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .slide-in-pile { animation: slideInPile 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    @keyframes confetti-fall {
+      0% { transform: translateY(-10px) rotateZ(0deg); opacity: 1; }
+      100% { transform: translateY(300px) rotateZ(720deg); opacity: 0; }
+    }
+    .confetti { 
+      position: fixed; 
+      pointer-events: none; 
+      font-size: 28px;
+      animation: confetti-fall 2.5s ease-in forwards;
+      z-index: 200;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    @keyframes emojiPop {
+      0% { opacity: 0; transform: scale(0) translateY(0); }
+      50% { opacity: 1; transform: scale(1.3); }
+      100% { opacity: 0; transform: scale(0.8) translateY(-50px); }
+    }
+    .emoji-reaction { 
+      position: absolute; 
+      font-size: 40px;
+      animation: emojiPop 1.2s ease-out forwards;
+      pointer-events: none;
+      z-index: 50;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+    }
+
+    @keyframes cardToDiscard {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0.7; transform: scale(0.6) translateY(300px); }
+    }
+    .card-to-discard { 
+      animation: cardToDiscard 2.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      position: fixed !important;
+      z-index: 99 !important;
+    }
+
+    @keyframes turnFade {
+      0% { opacity: 0; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .turn-transition { animation: turnFade 3s ease-out; }
+
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: 0 0 10px rgba(126, 201, 161, 0); }
+      50% { text-shadow: 0 0 20px rgba(126, 201, 161, 0.6); }
+    }
+    .pulse-glow { animation: pulse-glow 1.5s ease-in-out infinite; }
+
+    .toast-msg {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      padding: 12px 28px; border-radius: 12px; z-index: 100;
+      font-weight: 600; opacity: 0; transition: opacity 0.3s;
+      pointer-events: none;
+      font-size: 13px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .toast-msg.show { opacity: 1; }
+    .toast-msg.error {
+      font-size: 20px;
+      font-weight: 900;
+      color: #ff6b6b !important;
+      border: 2px solid #ff6b6b !important;
+      background: #2a1a1a !important;
+      opacity: 1 !important;
+      animation: pulse 0.4s ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .opponent-row {
+      display: flex;
+      gap: 1px;
+      justify-content: center;
+      font-size: 11px;
+    }
+    @media (min-width: 768px) {
+      .opponent-row {
+        gap: 2px;
+        font-size: 12px;
+      }
+    }
+    .opp-card-back {
+      width: 48px; height: 67px; border-radius: 4px;
+      background: linear-gradient(135deg, #2d5a45, #1a3a2a);
+      border: 1px solid #4a8a6f;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #6ba98f;
+    }
+    @media (min-width: 768px) {
+      .opp-card-back {
+        width: 54px; height: 75px; border-radius: 6px;
+        font-size: 14px;
+        border: 2px solid #4a8a6f;
+      }
+    }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full overflow-auto" style="background: linear-gradient(160deg, #0f3d2f 0%, #1f6b4a 40%, #2d8b5f 100%);">
+  <div id="app" class="h-full w-full flex flex-col" style="min-height: 100%;">
+   <div id="toast" class="toast-msg" style="background: #1a2e24; color: #a8d5ba; border: 1px solid #a8d5ba66;"></div>
+   <div id="difficultyModal" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,0.7); display: none;">
+    <div class="bg-gradient-to-br from-gray-900 to-gray-800 p-8 rounded-lg shadow-2xl max-w-2xl w-full mx-4" style="border: 2px solid #a8d5ba44;">
+     <h2 class="text-2xl font-bold mb-6 text-center" style="font-family: 'Cinzel', serif; color: #a8d5ba;">Choose Opponent Difficulty</h2>
+     <div class="grid grid-cols-3 gap-4 mb-6">
+      <div>
+       <div class="text-sm font-semibold mb-3 text-center" style="color: #8ab4d8;">
+        🤖 Bot A
+       </div>
+       <div class="space-y-2">
+        <button onclick="selectBotDifficulty('a', 'average')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="a" data-diff="average" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          😌
+         </div> Average </button> <button onclick="selectBotDifficulty('a', 'gamer')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="a" data-diff="gamer" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          🎮
+         </div> Gamer </button> <button onclick="selectBotDifficulty('a', 'master')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="a" data-diff="master" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          👑
+         </div> Master </button>
+       </div>
+      </div>
+      <div>
+       <div class="text-sm font-semibold mb-3 text-center" style="color: #8ab4d8;">
+        🤖 Bot B
+       </div>
+       <div class="space-y-2">
+        <button onclick="selectBotDifficulty('b', 'average')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="b" data-diff="average" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          😌
+         </div> Average </button> <button onclick="selectBotDifficulty('b', 'gamer')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="b" data-diff="gamer" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          🎮
+         </div> Gamer </button> <button onclick="selectBotDifficulty('b', 'master')" class="difficulty-btn w-full py-2 px-3 rounded-lg text-sm font-semibold transition-all border-2" data-bot="b" data-diff="master" style="background: #1a2e2455; color: #7ec9a1; border-color: #4a8a6f;">
+         <div style="font-size: 18px; margin-bottom: 4px;">
+          👑
+         </div> Master </button>
+       </div>
+      </div>
+      <div>
+       <div class="text-sm font-semibold mb-3 text-center" style="color: #a8d5ba;">
+        Info
+       </div>
+       <div class="text-xs p-3 rounded-lg" style="background: #1a2e2455; color: #7ec9a1; line-height: 1.6;">
+        <div id="diffDescriptor">
+         Select a difficulty level for each bot...
+        </div>
+       </div>
+      </div>
+     </div><button id="startGameBtn" onclick="confirmDifficulties()" class="w-full py-3 rounded-lg font-bold text-sm" style="background: linear-gradient(135deg, #5eb35f, #4a9550); color: #f0f8f0; border: none; cursor: pointer;"> Start Game </button>
+    </div>
+   </div>
+   <header class="flex items-center justify-between px-3 py-1 flex-shrink-0 gap-2">
+    <div>
+     <h1 id="gameTitle" class="text-lg font-bold tracking-wide" style="font-family: 'Cinzel', serif; color: #a8d5ba;">GenSci Cards</h1>
+     <p style="font-size: 9px; color: #7ec9a1; margin: 0; letter-spacing: 0.5px; font-weight: bold;">by A1</p>
+    </div>
+    <div style="text-align: right; font-size: 11px; flex: 1;">
+     <div style="color: #a8d5ba; margin-bottom: 1px; font-weight: bold;">
+      Round Score
+     </div>
+     <div style="display: flex; gap: 6px; justify-content: flex-end;">
+      <div style="color: #a8d5ba;">
+       You: <span id="scorePlayer" style="color: #7ec9a1; font-weight: bold; font-size: 14px;">0</span>
+      </div>
+      <div style="color: #8ab4d8;">
+       A: <span id="scoreBotA" style="color: #8ab4d8; font-weight: bold; font-size: 14px;">0</span>
+      </div>
+      <div style="color: #d084d0;">
+       B: <span id="scoreBotB" style="color: #d084d0; font-weight: bold; font-size: 14px;">0</span>
+      </div>
+     </div>
+    </div>
+   </header>
+   <div class="flex justify-around px-2 py-1 flex-shrink-0 items-center gap-1">
+    <div class="flex items-center gap-1">
+     <div id="botAStack" style="position: relative; width: 16px; height: 22px;">
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #8ab4d888, #8ab4d844); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: -0.3px; left: -0.3px;"></div>
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #8ab4d888, #8ab4d844); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: 0px; left: 0px;"></div>
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #8ab4d888, #8ab4d844); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: 0.3px; left: 0.3px;"></div>
+     </div>
+     <div style="text-align: center;">
+      <div style="font-size: 11px; font-weight: bold; color: #a8d5ba;">
+       🤖A
+      </div>
+      <div id="botACount" style="font-size: 14px; font-weight: bold; color: #8ab4d8;"></div>
+      <div id="botADiffTag" style="font-size: 8px; color: #a8d5ba;"></div>
+     </div>
+    </div>
+    <div class="flex items-center gap-1">
+     <div id="botBStack" style="position: relative; width: 16px; height: 22px;">
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #d08ad088, #d08ad044); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: -0.3px; left: -0.3px;"></div>
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #d08ad088, #d08ad044); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: 0px; left: 0px;"></div>
+      <div style="position: absolute; width: 16px; height: 22px; border-radius: 1px; border: 1px solid #333; background: linear-gradient(135deg, #d08ad088, #d08ad044); box-shadow: 0 1px 2px rgba(0,0,0,0.3); top: 0.3px; left: 0.3px;"></div>
+     </div>
+     <div style="text-align: center;">
+      <div style="font-size: 11px; font-weight: bold; color: #a8d5ba;">
+       🤖B
+      </div>
+      <div id="botBCount" style="font-size: 14px; font-weight: bold; color: #d084d0;"></div>
+      <div id="botBDiffTag" style="font-size: 8px; color: #a8d5ba;"></div>
+     </div>
+    </div>
+   </div>
+   <div class="flex-1 flex flex-col items-center justify-center px-2" style="gap: 3px;">
+    <div id="turnIndicator" class="text-sm font-bold slide-up" style="color: #7ec9a1; height: 18px;"></div>
+    <div class="flex items-center justify-center gap-2 flex-1">
+     <div id="pile" class="relative flex items-center justify-center" style="min-height: 60px; min-width: 120px;">
+      <div id="pileCards" class="flex gap-0.5 items-center justify-center flex-wrap"></div>
+     </div>
+     <div class="text-center">
+      <div style="font-size: 10px; font-weight: bold; color:#6ba98f; margin-bottom: 1px;">
+       Draw Pile
+      </div>
+      <div id="drawPileDisplay" style="font-size: 14px; font-weight: bold; color:#a8d5ba; background:#1a2e2455; padding:4px 8px; border-radius:4px; min-width:45px; border: 1px solid #4a8a6f;"></div>
+     </div>
+    </div>
+    <div style="text-align: center; flex-shrink-0; font-size: 11px; font-weight: bold; color:#a8d5ba;">
+     Round <span id="roundDisplay">1</span>/4
+    </div>
+   </div>
+   <div id="drawPileModal" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,0.7); display: none;">
+    <div class="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-lg shadow-2xl max-w-4xl w-full mx-4" style="border: 2px solid #a8d5ba44;">
+     <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold" style="font-family: 'Cinzel', serif; color: #a8d5ba;">Remaining Draw Pile</h2><button onclick="toggleDrawPileModal()" class="text-xl" style="color:#a8d5ba; background:none; border:none; cursor:pointer;">✕</button>
+     </div>
+     <div id="drawPileContent" class="flex flex-wrap gap-2 justify-center max-h-96 overflow-y-auto p-2"></div>
+    </div>
+   </div>
+   <div class="flex-shrink-0 pb-2 px-2">
+    <div class="flex justify-center gap-2 mb-2 items-center flex-wrap">
+     <button id="btnPlay" onclick="playSelected()" class="px-3 py-1.5 rounded-lg font-bold text-xs transition-all active:scale-95" style="background: linear-gradient(135deg, #5eb35f, #4a9550); color: #ffffff; border: none;"> Play Cards </button>
+     <div id="lastAction" style="font-size: 11px; font-weight: bold; color:#a8d5ba; background:#1a2e2455; padding:5px 8px; border-radius:5px; min-width:95px; border: 1px solid #4a8a6f; text-align:center; flex-grow:1; max-width:220px;"></div><button id="btnPass" onclick="passTurn()" class="px-2.5 py-1.5 rounded-lg font-semibold text-xs transition-all active:scale-95" style="background: linear-gradient(135deg, #5eb35f, #4a9550); color: #ff0000; border: none;"> Pass </button> <button id="soundToggle" onclick="toggleSound()" class="px-1.5 py-1.5 rounded-lg transition-all" style="background: #a8d5ba22; color: #a8d5ba; border: 1px solid #a8d5ba55;" title="Toggle sound"> <i data-lucide="volume-2" style="width:14px;height:14px;display:inline;"></i> </button>
+    </div>
+    <div id="playerHand" class="hand-area"></div>
+    <div class="flex justify-between items-center mt-1.5 gap-2">
+     <button id="btnNewGame" class="px-2 py-1 rounded-lg text-xs font-semibold" style="background: #a8d5ba22; color: #a8d5ba; border: 1px solid #a8d5ba55;" onclick="openDifficultyModal()"> <i data-lucide="refresh-cw" style="width:12px;height:12px;display:inline;vertical-align:middle;margin-right:2px;"></i>New </button>
+     <div class="text-center flex-1"><span style="font-size: 10px; font-weight: bold; color:#a8d5ba;">You <span id="playerCount" class="opacity-60"></span></span>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+// ============ AUDIO SYNTHESIS ============
+let soundEnabled = true;
+let audioContext = null;
+
+function initAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playSound(type) {
+  if (!soundEnabled || !audioContext) return;
+  
+  const ctx = audioContext;
+  const now = ctx.currentTime;
+  
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    switch(type) {
+      case 'play':
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+        break;
+      case 'pass':
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+        break;
+      case 'win':
+        const freqs = [523, 659, 784, 1047];
+        freqs.forEach((freq, i) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.1, now + i * 0.1);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.15);
+          o.start(now + i * 0.1);
+          o.stop(now + i * 0.1 + 0.15);
+        });
+        break;
+      case 'error':
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        osc.start(now);
+        osc.stop(now + 0.1);
+        break;
+    }
+  } catch(e) {
+    console.log('Audio error:', e);
+  }
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const btn = document.getElementById('soundToggle');
+  btn.style.opacity = soundEnabled ? '1' : '0.5';
+  showToast(soundEnabled ? '🔊 Sound enabled' : '🔇 Sound muted', 800);
+}
+
+const SUITS = [
+  { name: 'Red', symbol: '🔴', color: '#e85d5d' },
+  { name: 'Blue', symbol: '🔵', color: '#8ab4d8' },
+  { name: 'Purple', symbol: '🟣', color: '#d084d0' },
+  { name: 'Green', symbol: '🟢', color: '#6dc9a0' },
+];
+
+const RANKS = ['fundamentalparticles', 'atoms', 'elements', 'compounds', 'cells', 'organs', 'organsystems', 'organisms', 'ecosystems', 'planets', 'planetarysystems', 'galaxies', 'theuniverse'];
+
+const NUM_PLAYERS = 3;
+const PLAYER_INDEX = 0;
+let drawPile = [];
+
+let hands = [];
+let currentPile = [];
+let currentTurn = 0;
+let passCount = 0;
+let lastPlayedBy = -1;
+let gameOver = false;
+let selectedIndices = new Set();
+let botDifficulties = { a: 'average', b: 'average' };
+let tempBotDifficulties = { a: 'average', b: 'average' };
+let currentErrorMessage = null;
+let roundNumber = 1;
+let scores = [0, 0, 0];
+let roundWinner = null;
+
+const difficultyDescriptions = {
+  average: '😌 Average - Plays predictably, always the lowest card',
+  gamer: '🎮 Gamer - Makes random strategic plays',
+  master: '👑 Master - Plays optimally, tough to beat!'
+};
+
+function makeDeck() {
+  const deck = [];
+  for (let si = 0; si < SUITS.length; si++) {
+    for (let ri = 0; ri < RANKS.length; ri++) {
+      deck.push({ suit: si, rank: ri, id: `${si}-${ri}` });
+    }
+  }
+  return deck;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function cardValue(c) {
+  return c.rank * SUITS.length + c.suit;
+}
+
+function sortHand(hand) {
+  hand.sort((a, b) => cardValue(a) - cardValue(b));
+}
+
+function cardLabel(c) {
+  const rankLabel = RANKS[c.rank].substring(0, 3);
+  return `${rankLabel}${SUITS[c.suit].symbol}`;
+}
+
+function getComboType(cards) {
+  const n = cards.length;
+  if (n === 0) return null;
+  
+  if (n === 1) return { type: 'single', strength: cards[0].rank };
+  
+  if (n === 2 && cards[0].rank === cards[1].rank)
+    return { type: 'pair', strength: cards[0].rank };
+  
+  if (n === 3 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank)
+    return { type: 'trio', strength: cards[0].rank };
+  
+  if (n === 4 && cards[0].rank === cards[1].rank && cards[1].rank === cards[2].rank && cards[2].rank === cards[3].rank)
+    return { type: 'fourofakind', strength: cards[0].rank };
+  
+  if (n >= 3 && n <= 5) {
+    const sorted = [...cards].sort((a, b) => a.rank - b.rank);
+    const ranks = sorted.map(c => c.rank);
+    const isStraight = ranks.every((r, i) => i === 0 || r === ranks[i-1] + 1);
+    
+    if (isStraight) {
+      const highestRank = Math.max(...ranks);
+      return { type: 'run', runLength: n, strength: highestRank };
+    }
+  }
+  
+  return null;
+}
+
+function canBeat(newCards, pileCards) {
+  if (pileCards.length === 0) return getComboType(newCards) !== null;
+  const newCombo = getComboType(newCards);
+  const oldCombo = getComboType(pileCards);
+  if (!newCombo || !oldCombo) return false;
+
+  if (newCombo.type === oldCombo.type) {
+    if (newCombo.type === 'run' && newCombo.runLength !== oldCombo.runLength) return false;
+    
+    if (newCombo.strength !== oldCombo.strength) {
+      return newCombo.strength > oldCombo.strength;
+    }
+    
+    const newSuit = Math.min(...newCards.map(c => c.suit));
+    const oldSuit = Math.min(...pileCards.map(c => c.suit));
+    return newSuit < oldSuit;
+  }
+  
+  return false;
+}
+
+function getComboDescription(cards) {
+  const combo = getComboType(cards);
+  if (!combo) return 'cards';
+  
+  if (combo.type === 'single') return 'a single card';
+  if (combo.type === 'pair') return 'a pair';
+  if (combo.type === 'trio') return 'a trio';
+  if (combo.type === 'fourofakind') return 'four of a kind';
+  if (combo.type === 'run') {
+    const lengths = { 3: '3 consecutive', 4: '4 consecutive', 5: '5 consecutive' };
+    return lengths[combo.runLength] || 'a run';
+  }
+  return 'cards';
+}
+
+function renderCard(c, index, isPlayer) {
+  const s = SUITS[c.suit];
+  const rankName = RANKS[c.rank].toLowerCase().replace(/\s+/g, '_');
+  const suitName = s.name.toLowerCase();
+  const imageUrl = `https://res.cloudinary.com/dzfgt5nko/image/upload/v1/gensci_cards/${suitName}_${rankName}.png`;
+  
+  const div = document.createElement('div');
+  div.className = 'game-card deal-anim';
+  if (isPlayer && selectedIndices.has(index)) div.classList.add('selected');
+  div.style.border = '1.5px solid #333';
+  div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+  div.style.animationDelay = `${index * 40}ms`;
+  div.style.position = 'relative';
+  div.style.overflow = 'hidden';
+  div.style.background = `linear-gradient(135deg, ${s.color}88, ${s.color}44)`;
+  
+  const img = document.createElement('img');
+  img.src = imageUrl;
+  img.style.width = '100%';
+  img.style.height = '100%';
+  img.style.objectFit = 'cover';
+  img.style.borderRadius = 'inherit';
+  img.loading = 'lazy';
+  
+  let imageLoaded = false;
+  
+  img.onerror = function() {
+    if (!imageLoaded) {
+      img.style.display = 'none';
+      imageLoaded = true;
+    }
+  };
+  
+  img.onload = function() {
+    div.style.background = 'none';
+    imageLoaded = true;
+  };
+  
+  div.appendChild(img);
+  return div;
+}
+
+function renderPlayerHand() {
+  const el = document.getElementById('playerHand');
+  el.innerHTML = '';
+  hands[PLAYER_INDEX].forEach((c, i) => {
+    const card = renderCard(c, i, true);
+    card.style.animationDelay = `${i * 40}ms`;
+    card.onclick = (e) => {
+      e.stopPropagation();
+      if (gameOver || currentTurn !== PLAYER_INDEX) return;
+      if (selectedIndices.has(i)) {
+        selectedIndices.delete(i);
+      } else {
+        selectedIndices.add(i);
+      }
+      updateCardSelection();
+    };
+    el.appendChild(card);
+  });
+  document.getElementById('playerCount').textContent = `(${hands[PLAYER_INDEX].length})`;
+}
+
+function updateCardSelection() {
+  hands[PLAYER_INDEX].forEach((c, i) => {
+    const cards = document.querySelectorAll('#playerHand .game-card');
+    if (cards[i]) {
+      if (selectedIndices.has(i)) {
+        cards[i].classList.add('selected');
+      } else {
+        cards[i].classList.remove('selected');
+      }
+    }
+  });
+}
+
+function renderOpponents() {
+  [1,2].forEach((pi, bi) => {
+    const countId = ['botACount','botBCount'][bi];
+    const tagId = ['botADiffTag','botBDiffTag'][bi];
+    const countEl = document.getElementById(countId);
+    const tagEl = document.getElementById(tagId);
+    
+    if (!hands[pi]) return;
+    countEl.textContent = hands[pi].length;
+    
+    const diff = botDifficulties[bi === 0 ? 'a' : 'b'];
+    const icons = { average: '😌', gamer: '🎮', master: '👑' };
+    tagEl.textContent = icons[diff];
+    tagEl.style.color = diff === 'master' ? '#e2c97e' : '#a8d5ba';
+  });
+}
+
+function renderPile() {
+  const el = document.getElementById('pileCards');
+  el.innerHTML = '';
+  if (currentPile.length === 0) {
+    el.innerHTML = '<span style="color:#4a6a8a;font-size:20px;font-weight:bold;">No cards played yet</span>';
+    return;
+  }
+  currentPile.forEach((c, i) => {
+    const card = renderCard(c, i, false);
+    card.classList.remove('game-card', 'deal-anim');
+    card.classList.add('slide-in-pile');
+    card.style.width = '120px';
+    card.style.height = '168px';
+    card.style.cursor = 'default';
+    card.style.flexShrink = '0';
+    card.style.borderRadius = '12px';
+    card.style.position = 'relative';
+    card.style.margin = '0 6px';
+    card.style.animationDelay = `${i * 100}ms`;
+    el.appendChild(card);
+  });
+}
+
+function updateTurnIndicator() {
+  const el = document.getElementById('turnIndicator');
+  if (gameOver) return;
+  const names = ['Your', "Bot A's", "Bot B's"];
+  el.textContent = `${names[currentTurn]} turn`;
+  el.style.color = currentTurn === PLAYER_INDEX ? '#e2c97e' : '#8ab4d8';
+  el.classList.remove('turn-transition');
+  void el.offsetWidth;
+  el.classList.add('turn-transition');
+}
+
+function showToast(msg, duration = 1800, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (isError) {
+    t.classList.add('error');
+    currentErrorMessage = msg;
+  } else {
+    t.classList.remove('error');
+    if (currentErrorMessage) {
+      currentErrorMessage = null;
+    } else {
+      setTimeout(() => t.classList.remove('show'), duration);
+    }
+  }
+}
+
+function openDifficultyModal() {
+  tempBotDifficulties = { ...botDifficulties };
+  document.getElementById('difficultyModal').style.display = 'flex';
+  updateDifficultyDescription('average');
+  lucide.createIcons();
+}
+
+function selectBotDifficulty(bot, difficulty) {
+  tempBotDifficulties[bot] = difficulty;
+  updateDifficultyDescription(difficulty);
+  
+  document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    const btnBot = btn.getAttribute('data-bot');
+    const btnDiff = btn.getAttribute('data-diff');
+    const isSelected = tempBotDifficulties[btnBot] === btnDiff;
+    btn.style.background = isSelected ? '#4a8a6f' : '#1a2e2455';
+    btn.style.color = isSelected ? '#f0f8f0' : '#7ec9a1';
+    btn.style.borderColor = isSelected ? '#a8d5ba' : '#4a8a6f';
+  });
+}
+
+function updateDifficultyDescription(difficulty) {
+  document.getElementById('diffDescriptor').textContent = difficultyDescriptions[difficulty];
+}
+
+function confirmDifficulties() {
+  botDifficulties = { ...tempBotDifficulties };
+  document.getElementById('difficultyModal').style.display = 'none';
+  roundNumber = 1;
+  scores = [0, 0, 0];
+  roundWinner = null;
+  startGame();
+}
+
+function startGame() {
+  gameOver = false;
+  selectedIndices.clear();
+  currentPile = [];
+  passCount = 0;
+  lastPlayedBy = -1;
+  document.getElementById('lastAction').textContent = '';
+
+  const deck = shuffle(makeDeck());
+  const CARDS_PER_PLAYER = 11;
+  hands = [];
+  for (let i = 0; i < NUM_PLAYERS; i++) {
+    hands.push(deck.slice(i * CARDS_PER_PLAYER, (i + 1) * CARDS_PER_PLAYER));
+    sortHand(hands[i]);
+  }
+  
+  drawPile = deck.slice(NUM_PLAYERS * CARDS_PER_PLAYER);
+
+  let lowestVal = Infinity, starter = 0;
+  hands.forEach((h, i) => {
+    if (h.length && cardValue(h[0]) < lowestVal) {
+      lowestVal = cardValue(h[0]);
+      starter = i;
+    }
+  });
+  currentTurn = starter;
+
+  renderAll();
+  showToast('New game started!');
+
+  if (currentTurn !== PLAYER_INDEX) {
+    setTimeout(() => {
+      while (currentTurn !== PLAYER_INDEX && !gameOver && hands[currentTurn].length > 0) {
+        botTurn();
+      }
+    }, 400);
+  }
+}
+
+function startNextRound() {
+  roundNumber++;
+  gameOver = false;
+  selectedIndices.clear();
+  currentPile = [];
+  passCount = 0;
+  lastPlayedBy = -1;
+  roundWinner = null;
+  document.getElementById('lastAction').textContent = '';
+
+  const deck = shuffle(makeDeck());
+  const CARDS_PER_PLAYER = 11;
+  hands = [];
+  for (let i = 0; i < NUM_PLAYERS; i++) {
+    hands.push(deck.slice(i * CARDS_PER_PLAYER, (i + 1) * CARDS_PER_PLAYER));
+    sortHand(hands[i]);
+  }
+  
+  drawPile = deck.slice(NUM_PLAYERS * CARDS_PER_PLAYER);
+
+  let lowestVal = Infinity, starter = 0;
+  hands.forEach((h, i) => {
+    if (h.length && cardValue(h[0]) < lowestVal) {
+      lowestVal = cardValue(h[0]);
+      starter = i;
+    }
+  });
+  currentTurn = starter;
+
+  renderAll();
+  showToast(`Round ${roundNumber} starting...`);
+
+  if (currentTurn !== PLAYER_INDEX) setTimeout(botTurn, 300);
+}
+
+function showGameOver() {
+  const names = ['You', 'Bot A', 'Bot B'];
+  const winner = scores.indexOf(Math.max(...scores));
+  
+  document.getElementById('turnIndicator').textContent = `🏆 ${names[winner]} wins the match!`;
+  document.getElementById('turnIndicator').style.color = '#e2c97e';
+  
+  triggerConfetti();
+  showToast(`Game Over! ${names[winner]} ${winner === 0 ? 'win' : 'wins'} with ${scores[winner]} points! 🎉`, 5000);
+}
+
+function renderAll() {
+  renderPlayerHand();
+  renderOpponents();
+  renderPile();
+  updateTurnIndicator();
+  document.getElementById('drawPileDisplay').textContent = drawPile.length;
+  document.getElementById('roundDisplay').textContent = roundNumber;
+  document.getElementById('scorePlayer').textContent = scores[0];
+  document.getElementById('scoreBotA').textContent = scores[1];
+  document.getElementById('scoreBotB').textContent = scores[2];
+}
+
+function toggleDrawPileModal() {
+  const modal = document.getElementById('drawPileModal');
+  const isVisible = modal.style.display !== 'none';
+  modal.style.display = isVisible ? 'none' : 'flex';
+  
+  if (!isVisible) {
+    renderDrawPileModal();
+  }
+}
+
+function renderDrawPileModal() {
+  const container = document.getElementById('drawPileContent');
+  container.innerHTML = '';
+  
+  if (drawPile.length === 0) {
+    container.innerHTML = '<span style="color:#6ba98f; font-size:14px;">No cards remaining</span>';
+    return;
+  }
+  
+  const sorted = [...drawPile].sort((a, b) => {
+    if (a.suit !== b.suit) return a.suit - b.suit;
+    return a.rank - b.rank;
+  });
+  
+  sorted.forEach((c, idx) => {
+    const card = renderCard(c, idx, false);
+    card.classList.remove('game-card');
+    card.style.width = '60px';
+    card.style.height = '84px';
+    card.style.cursor = 'default';
+    card.style.flexShrink = '0';
+    card.style.borderRadius = '6px';
+    card.style.fontSize = '11px';
+    container.appendChild(card);
+  });
+}
+
+function playSelected() {
+  if (gameOver || currentTurn !== PLAYER_INDEX) return;
+  if (selectedIndices.size === 0) { showToast('Select cards to play'); return; }
+  const cards = [...selectedIndices].sort((a,b) => a-b).map(i => hands[PLAYER_INDEX][i]);
+
+  if (currentPile.length === 0 && lastPlayedBy === -1) {
+    const lowestCard = hands[PLAYER_INDEX][0];
+    if (!cards.find(c => c.id === lowestCard.id)) {
+      showToast('First turn: must include your lowest card', Infinity, true);
+      return;
+    }
+  }
+
+  if (currentPile.length > 0) {
+    if (cards.length !== currentPile.length) {
+      showToast(`Must play ${currentPile.length} card${currentPile.length > 1 ? 's' : ''}`, Infinity, true);
+      return;
+    }
+    if (!canBeat(cards, currentPile)) {
+      showToast('Invalid play — must beat the current combo', Infinity, true);
+      return;
+    }
+  }
+
+  initAudio();
+  playSound('play');
+  currentErrorMessage = null;
+  const t = document.getElementById('toast');
+  t.classList.remove('show');
+  t.textContent = '';
+
+  const playerHandCards = document.querySelectorAll('#playerHand .game-card');
+  [...selectedIndices].sort((a,b) => b-a).forEach(i => {
+    if (playerHandCards[i]) {
+      playerHandCards[i].classList.add('card-flip');
+    }
+  });
+
+  const cardsPlayedCount = selectedIndices.size;
+  
+  animatePlayerCardsToPile(cards);
+  
+  const cardsToRemove = [...selectedIndices].sort((a,b) => b-a);
+  cardsToRemove.forEach(i => hands[PLAYER_INDEX].splice(i, 1));
+  
+  currentPile = cards;
+  lastPlayedBy = PLAYER_INDEX;
+  passCount = 0;
+  selectedIndices.clear();
+  document.getElementById('lastAction').textContent = `You played ${getComboDescription(cards)}`;
+
+  replenishHand(PLAYER_INDEX, cardsPlayedCount);
+  
+  if (checkWin(PLAYER_INDEX)) return;
+  advanceTurn();
+  renderAll();
+  if (currentTurn !== PLAYER_INDEX) {
+    setTimeout(() => botTurn(), 2800);
+  }
+}
+
+function passTurn() {
+  if (gameOver || currentTurn !== PLAYER_INDEX) return;
+  if (currentPile.length === 0 && lastPlayedBy === PLAYER_INDEX) {
+    showToast("You must play — it's a free turn");
+    return;
+  }
+  if (currentPile.length === 0 && lastPlayedBy === -1 && currentTurn === PLAYER_INDEX) {
+    showToast("You must play the first card");
+    return;
+  }
+  initAudio();
+  playSound('pass');
+  passCount++;
+  document.getElementById('lastAction').textContent = 'You passed';
+  selectedIndices.clear();
+  checkPassReset();
+  advanceTurn();
+  renderAll();
+  if (currentTurn !== PLAYER_INDEX) {
+    while (currentTurn !== PLAYER_INDEX && !gameOver && hands[currentTurn].length > 0) {
+      botTurn();
+    }
+  }
+}
+
+function advanceTurn() {
+  do {
+    currentTurn = (currentTurn + 1) % NUM_PLAYERS;
+  } while (hands[currentTurn].length === 0 && !gameOver);
+}
+
+function checkPassReset() {
+  const active = hands.filter(h => h.length > 0).length;
+  if (passCount >= active - 1) {
+    currentPile = [];
+    passCount = 0;
+  }
+}
+
+function checkWin(pi) {
+  if (hands[pi].length === 0 && drawPile.length === 0) {
+    gameOver = true;
+    
+    let roundPoints = 0;
+    hands.forEach((hand, idx) => {
+      if (idx !== pi) {
+        hand.forEach(card => {
+          roundPoints += (card.rank + 1);
+        });
+      }
+    });
+    
+    roundWinner = pi;
+    scores[pi] += roundPoints;
+    
+    const names = ['You', 'Bot A', 'Bot B'];
+    document.getElementById('turnIndicator').textContent = `🏆 ${names[pi]} won Round ${roundNumber}!`;
+    document.getElementById('turnIndicator').style.color = '#e2c97e';
+    renderAll();
+    triggerConfetti();
+    showToast(`${names[pi]} ${pi === 0 ? 'win' : 'wins'} Round ${roundNumber}! (+${roundPoints} points) 🎉`, 3000);
+    
+    if (roundNumber === 4) {
+      setTimeout(showGameOver, 2500);
+    } else {
+      setTimeout(startNextRound, 3000);
+    }
+    
+    return true;
+  }
+  return false;
+}
+
+function replenishHand(pi, cardsPlayed) {
+  const cardsNeeded = cardsPlayed;
+  let cardsAdded = 0;
+  while (cardsAdded < cardsNeeded && drawPile.length > 0) {
+    hands[pi].push(drawPile.shift());
+    cardsAdded++;
+  }
+  sortHand(hands[pi]);
+}
+
+function doPass(pi, name) {
+  passCount++;
+  const passIndicator = ` (${name} passed)`;
+  const currentText = document.getElementById('lastAction').textContent;
+  if (!currentText.includes('passed')) {
+    document.getElementById('lastAction').textContent += passIndicator;
+  }
+  checkPassReset();
+  advanceTurn();
+  renderAll();
+  if (currentTurn !== PLAYER_INDEX) botTurn();
+}
+
+function triggerConfetti() {
+  initAudio();
+  playSound('win');
+  const emojis = ['🎉', '✨', '🎊', '⭐', '🌟'];
+  for (let i = 0; i < 40; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    confetti.style.left = Math.random() * 100 + '%';
+    confetti.style.animationDelay = Math.random() * 0.4 + 's';
+    document.body.appendChild(confetti);
+    setTimeout(() => confetti.remove(), 2800);
+  }
+}
+
+function showBotReaction(botElement, reaction) {
+  const emoji = document.createElement('div');
+  emoji.className = 'emoji-reaction';
+  emoji.textContent = reaction;
+  emoji.style.left = Math.random() * 40 + 30 + '%';
+  emoji.style.top = '10%';
+  botElement.style.position = 'relative';
+  botElement.appendChild(emoji);
+  setTimeout(() => emoji.remove(), 1300);
+}
+
+function animatePlayerCardsToPile(cards) {
+  const pileContainer = document.getElementById('pileCards');
+  const pileRect = pileContainer.getBoundingClientRect();
+  const handArea = document.getElementById('playerHand');
+  
+  cards.forEach((card, idx) => {
+    const cardElements = document.querySelectorAll('#playerHand .game-card');
+    const selectedCardElements = [...selectedIndices].sort((a,b) => a-b).map(i => cardElements[i]);
+    const cardElement = selectedCardElements[idx];
+    
+    if (cardElement) {
+      const cardRect = cardElement.getBoundingClientRect();
+      
+      const animCard = document.createElement('div');
+      animCard.className = 'card-to-discard';
+      animCard.style.width = '120px';
+      animCard.style.height = '168px';
+      animCard.style.borderRadius = '12px';
+      animCard.style.left = cardRect.left + 'px';
+      animCard.style.top = cardRect.top + 'px';
+      animCard.style.background = `linear-gradient(135deg, ${SUITS[card.suit].color}88, ${SUITS[card.suit].color}44)`;
+      animCard.style.border = '1.5px solid #333';
+      animCard.style.animationDelay = `${idx * 150}ms`;
+      
+      const img = document.createElement('img');
+      img.src = `https://res.cloudinary.com/dzfgt5nko/image/upload/v1/gensci_cards/${SUITS[card.suit].name.toLowerCase()}_${RANKS[card.rank].toLowerCase().replace(/\s+/g, '_')}.png`;
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = 'inherit';
+      img.loading = 'lazy';
+      img.onerror = () => img.style.display = 'none';
+      
+      animCard.appendChild(img);
+      animCard.style.setProperty('--pile-x', (pileRect.left - cardRect.left) + 'px');
+      animCard.style.setProperty('--pile-y', (pileRect.top - cardRect.top) + 'px');
+      
+      document.body.appendChild(animCard);
+      
+      setTimeout(() => animCard.remove(), 3000);
+    }
+  });
+}
+
+function animateCardsToPile(botPlayerIndex, cards) {
+  const pileContainer = document.getElementById('pileCards');
+  const pileRect = pileContainer.getBoundingClientRect();
+  
+  const botStackId = botPlayerIndex === 1 ? 'botAStack' : 'botBStack';
+  const botStack = document.getElementById(botStackId);
+  const botRect = botStack.getBoundingClientRect();
+  
+  cards.forEach((card, idx) => {
+    const animCard = document.createElement('div');
+    animCard.className = 'card-to-discard';
+    animCard.style.width = '120px';
+    animCard.style.height = '168px';
+    animCard.style.borderRadius = '12px';
+    animCard.style.left = botRect.left + 'px';
+    animCard.style.top = botRect.top + 'px';
+    animCard.style.background = `linear-gradient(135deg, ${SUITS[card.suit].color}88, ${SUITS[card.suit].color}44)`;
+    animCard.style.border = '1.5px solid #333';
+    animCard.style.animationDelay = `${idx * 150}ms`;
+    
+    const img = document.createElement('img');
+    img.src = `https://res.cloudinary.com/dzfgt5nko/image/upload/v1/gensci_cards/${SUITS[card.suit].name.toLowerCase()}_${RANKS[card.rank].toLowerCase().replace(/\s+/g, '_')}.png`;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.borderRadius = 'inherit';
+    img.loading = 'lazy';
+    img.onerror = () => img.style.display = 'none';
+    
+    animCard.appendChild(img);
+    animCard.style.setProperty('--pile-x', (pileRect.left - botRect.left) + 'px');
+    animCard.style.setProperty('--pile-y', (pileRect.top - botRect.top) + 'px');
+    
+    document.body.appendChild(animCard);
+    
+    setTimeout(() => animCard.remove(), 3000);
+  });
+}
+
+function botTurn() {
+  if (gameOver || currentTurn === PLAYER_INDEX) return;
+  const pi = currentTurn;
+  const hand = hands[pi];
+  const names = ['You','Bot A','Bot B'];
+  const difficulty = botDifficulties[pi - 1];
+  const botElement = pi === 1 ? document.querySelector('#botACount').parentElement : document.querySelector('#botBCount').parentElement;
+
+  let play = null;
+
+  if (currentPile.length === 0 && lastPlayedBy === -1) {
+    play = [hand[0]];
+  }
+  else if (currentPile.length === 0) {
+    if (difficulty === 'master') {
+      const midIdx = Math.floor(hand.length / 2);
+      play = [hand[midIdx]];
+    } else if (difficulty === 'gamer') {
+      play = Math.random() > 0.3 ? [hand[1]] || [hand[0]] : [hand[0]];
+    } else {
+      play = [hand[0]];
+    }
+  } 
+  else {
+    const pileType = getComboType(currentPile);
+    if (!pileType) { doPass(pi, names[pi]); return; }
+
+    const validPlays = [];
+    const pileLen = currentPile.length;
+
+    if (pileLen === 1) {
+      for (const c of hand) {
+        if (canBeat([c], currentPile)) validPlays.push([c]);
+      }
+    } else if (pileLen === 2) {
+      for (let i = 0; i < hand.length - 1; i++) {
+        if (hand[i].rank === hand[i+1].rank && canBeat([hand[i], hand[i+1]], currentPile)) {
+          validPlays.push([hand[i], hand[i+1]]);
+        }
+      }
+    } else if (pileLen === 3) {
+      for (let i = 0; i < hand.length - 2; i++) {
+        if (hand[i].rank === hand[i+1].rank && hand[i+1].rank === hand[i+2].rank &&
+            canBeat([hand[i], hand[i+1], hand[i+2]], currentPile)) {
+          validPlays.push([hand[i], hand[i+1], hand[i+2]]);
+        }
+      }
+    } else if (pileLen === 4) {
+      for (let i = 0; i < hand.length - 3; i++) {
+        if (hand[i].rank === hand[i+1].rank && hand[i+1].rank === hand[i+2].rank && hand[i+2].rank === hand[i+3].rank &&
+            canBeat([hand[i], hand[i+1], hand[i+2], hand[i+3]], currentPile)) {
+          validPlays.push([hand[i], hand[i+1], hand[i+2], hand[i+3]]);
+        }
+      }
+    } else if (pileLen >= 3 && pileLen <= 5) {
+      for (let i = 0; i <= hand.length - pileLen; i++) {
+        const candidate = hand.slice(i, i + pileLen);
+        if (getComboType(candidate)?.type === 'run' && canBeat(candidate, currentPile)) {
+          validPlays.push(candidate);
+        }
+      }
+    }
+
+    if (validPlays.length > 0) {
+      if (difficulty === 'master') {
+        play = validPlays.reduce((a, b) => {
+          const aRank = getComboType(a).strength;
+          const bRank = getComboType(b).strength;
+          return aRank > bRank ? a : b;
+        });
+        showBotReaction(botElement, '💪');
+      } else if (difficulty === 'gamer') {
+        if (Math.random() < 0.6) {
+          play = validPlays.reduce((a, b) => {
+            const aRank = getComboType(a).strength;
+            const bRank = getComboType(b).strength;
+            return aRank > bRank ? a : b;
+          });
+        } else {
+          play = validPlays[Math.floor(Math.random() * validPlays.length)];
+        }
+        showBotReaction(botElement, '🎯');
+      } else {
+        if (Math.random() < 0.3) {
+          play = validPlays.reduce((a, b) => {
+            const aRank = getComboType(a).strength;
+            const bRank = getComboType(b).strength;
+            return aRank > bRank ? a : b;
+          });
+        } else {
+          play = validPlays[0];
+        }
+        showBotReaction(botElement, '🤔');
+      }
+    }
+  }
+
+  if (!play) { doPass(pi, names[pi]); return; }
+
+  animateCardsToPile(pi, play);
+
+  const cardsPlayedCount = play.length;
+  play.forEach(pc => {
+    const idx = hand.findIndex(c => c.id === pc.id);
+    if (idx >= 0) hand.splice(idx, 1);
+  });
+  currentPile = play;
+  lastPlayedBy = pi;
+  passCount = 0;
+  document.getElementById('lastAction').textContent = `${names[pi]} played ${getComboDescription(play)}`;
+
+  replenishHand(pi, cardsPlayedCount);
+
+  if (checkWin(pi)) return;
+  advanceTurn();
+  renderAll();
+  if (currentTurn !== PLAYER_INDEX) {
+    setTimeout(() => {
+      while (currentTurn !== PLAYER_INDEX && !gameOver && hands[currentTurn].length > 0) {
+        botTurn();
+      }
+    }, 2800);
+  }
+}
+
+const defaultConfig = {
+  game_title: 'GenSci Cards',
+  bot_a_difficulty: 'average',
+  bot_b_difficulty: 'average',
+  background_color: '#1a3a2a',
+  surface_color: '#3d6b4f',
+  text_color: '#a8d5ba',
+  primary_action_color: '#5eb35f',
+  secondary_action_color: '#7ec9a1'
+};
+
+function applyConfig(config) {
+  const bg = config.background_color || defaultConfig.background_color;
+  const surface = config.surface_color || defaultConfig.surface_color;
+  const text = config.text_color || defaultConfig.text_color;
+  const primary = config.primary_action_color || defaultConfig.primary_action_color;
+  const secondary = config.secondary_action_color || defaultConfig.secondary_action_color;
+  const font = config.font_family || 'Cinzel';
+  const fontSize = config.font_size || 16;
+  const title = config.game_title || defaultConfig.game_title;
+
+  document.body.style.background = `linear-gradient(160deg, ${bg} 0%, ${surface} 40%, ${adjustColor(surface, 20)} 100%)`;
+  document.getElementById('gameTitle').textContent = title;
+  document.getElementById('gameTitle').style.color = text;
+  document.getElementById('gameTitle').style.fontFamily = `${font}, Cinzel, serif`;
+  document.getElementById('gameTitle').style.fontSize = `${fontSize * 1.3}px`;
+
+  document.getElementById('btnNewGame').style.background = `${text}22`;
+  document.getElementById('btnNewGame').style.color = text;
+  document.getElementById('btnNewGame').style.borderColor = `${text}55`;
+
+  document.getElementById('btnPlay').style.background = `linear-gradient(135deg, ${primary}, ${adjustColor(primary, -20)})`;
+  document.getElementById('btnPass').style.color = secondary;
+  document.getElementById('btnPass').style.borderColor = `${secondary}55`;
+
+  document.getElementById('turnIndicator').style.color = secondary;
+  document.querySelectorAll('[style*="color:#6ba98f"]').forEach(el => el.style.color = secondary);
+}
+
+function adjustColor(hex, amt) {
+  let c = hex.replace('#','');
+  let r = Math.min(255, Math.max(0, parseInt(c.substr(0,2),16) + amt));
+  let g = Math.min(255, Math.max(0, parseInt(c.substr(2,2),16) + amt));
+  let b = Math.min(255, Math.max(0, parseInt(c.substr(4,2),16) + amt));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange: async (config) => {
+    soundEnabled = config.sound_enabled !== 'false';
+    document.getElementById('soundToggle').style.opacity = soundEnabled ? '1' : '0.5';
+    applyConfig(config);
+  },
+  mapToCapabilities: (config) => ({
+    recolorables: [
+      { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+      { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+      { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+      { get: () => config.primary_action_color || defaultConfig.primary_action_color, set: (v) => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); } },
+      { get: () => config.secondary_action_color || defaultConfig.secondary_action_color, set: (v) => { config.secondary_action_color = v; window.elementSdk.setConfig({ secondary_action_color: v }); } },
+    ],
+    borderables: [],
+    fontEditable: {
+      get: () => config.font_family || defaultConfig.font_family || 'Cinzel',
+      set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); }
+    },
+    fontSizeable: {
+      get: () => config.font_size || defaultConfig.font_size || 16,
+      set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); }
+    }
+  }),
+  mapToEditPanelValues: (config) => new Map([
+    ['game_title', config.game_title || defaultConfig.game_title],
+    ['bot_a_difficulty', config.bot_a_difficulty || defaultConfig.bot_a_difficulty],
+    ['bot_b_difficulty', config.bot_b_difficulty || defaultConfig.bot_b_difficulty],
+    ['sound_enabled', config.sound_enabled !== 'false' ? 'true' : 'false']
+  ])
+});
+
+startGame();
+lucide.createIcons();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e3ad99e46e06b61',t:'MTc3NDc0NTEwOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
